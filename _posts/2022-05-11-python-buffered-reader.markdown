@@ -2,7 +2,7 @@
 layout: post
 title:  "Exploiting a Use-After-Free for code execution in every version of Python 3"
 date:   2022-05-11 00:00:00 +0000
-categories: python
+tags: python
 ---
 
 A while ago I was browsing the Python [bug tracker](https://bugs.python.org), and  I stumbled upon this bug - "[memoryview to freed memory can cause segfault](https://bugs.python.org/issue15994)". It was created in 2012, originally present in Python 2.7, but remains open to this day, 10 years later. This piqued my interest, so I decided to take a closer look.
