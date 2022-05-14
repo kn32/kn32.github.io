@@ -64,7 +64,9 @@ This bug is a fairly typical use-after-free, but to understand it we must first 
 > 
 > When reading data from [the BufferedReader], a larger amount of data may be requested from the underlying raw stream, and kept in an internal buffer. The buffered data can then be returned directly on subsequent reads.
 
-The internal buffer used by the buffered reader is [allocated](https://github.com/python/cpython/blob/3.10/Modules/_io/bufferedio.c#L732) during initialization of the object. When we read from the buffered reader and the data doesn't exist in its internal buffer,  it will [read](https://github.com/python/cpython/blob/3.10/Modules/_io/bufferedio.c#L1476) from the underlying stream. The read from the underlying stream happens via the [`readinto`](https://docs.python.org/3/library/io.html#io.RawIOBase.readinto) function on the underlying stream, which receives a buffer as an argument, which it is supposed to read data, from wherever it resides, into. The buffer passed as an argument is actually a [`memoryview`](https://docs.python.org/3/library/stdtypes.html#memoryview) which is [backed by](https://github.com/python/cpython/blob/3.10/Modules/_io/bufferedio.c#L1467) the `BufferedReader`'s internal buffer. You can think of the `memoryview` as a pointer to, or a view of, the internal buffer.
+In the proof of concept we first define a class called `File`, which inherits from `io.RawIOBase`, and define some methods on it. We then create a `BufferedReader` object, specifying an instance of the custom `File` class as the underlying raw stream.
+
+When the `BufferedReader` is initialized it [allocates](https://github.com/python/cpython/blob/3.10/Modules/_io/bufferedio.c#L732) an internal buffer. When we read from the buffered reader (line 11) and the data doesn't exist in its internal buffer, it will [read](https://github.com/python/cpython/blob/3.10/Modules/_io/bufferedio.c#L1476) from the underlying stream. The read from the underlying stream happens via the [`readinto`](https://docs.python.org/3/library/io.html#io.RawIOBase.readinto) function, which receives a buffer as an argument, which the raw stream is supposed to read data into. The buffer passed as an argument is actually a [`memoryview`](https://docs.python.org/3/library/stdtypes.html#memoryview) which is [backed by](https://github.com/python/cpython/blob/3.10/Modules/_io/bufferedio.c#L1467) the `BufferedReader`'s internal buffer. You can think of the `memoryview` as a pointer to, or a view of, the internal buffer.
 
 Given that we control the underlying stream object, we can make the `readinto` function save a reference to this `memoryview` argument, which will persist even once we've returned from the function, which is exactly what the PoC does on line 6.
 
@@ -74,7 +76,7 @@ Once we have saved a reference to the `memoryview` we can delete the `BufferedRe
 
 Now we have a memoryview pointing to freed heap memory, which we can read from or write to, where do we go from here? 
 
-The easiest approach for exploitation is to create a list with length equal to the length of the freed buffer, which will very likely have its item buffer (`ob_item`) allocated in the same place as the freed buffer. This will mean we get two different "views" on the same piece of memory. One view, the `memoryview`, thinks that the memory is just an array of bytes, which we can write to or read from arbitarily. The second view is the list we created, which thinks that the memory is a list of `PyObject` pointers. This means we can create fake `PyObject`s in memory, write their pointers into the list by writing to the `memoryview`, and then access them by indexing into the list.
+The easiest approach for exploitation is to create a list with length equal to the length of the freed buffer, which will very likely have its item buffer (`ob_item`) allocated in the same place as the freed buffer. This will mean we get two different "views" on the same piece of memory. One view, the `memoryview`, thinks that the memory is just an array of bytes, which we can write to or read from arbitarily. The second view is the list we created, which thinks that the memory is a list of `PyObject` pointers. This means we can create fake `PyObject`s somewhere in memory, write their addresses into the list by writing to the `memoryview`, and then access them by indexing into the list.
 
 In the case of the PoC, they write `0` to the buffer (line 16), and then access it with `print(L[0])`. `L[0]` gets the first `PyObject*` which is `0` and then `print` tries to access some fields on it, resulting in a null pointer dereference.
 
@@ -101,7 +103,7 @@ typedef struct {
 ```
 `ob_bytes` is a pointer to a heap-allocated buffer. When we read from or write to the bytearray, we're reading/writing to this heap buffer. If we can craft a fake `bytearray` object, and we can set `ob_bytes` to point to an arbitrary address, then we can read or write to this arbitrary address by reading or writing to this `bytearray`.
 
-Crafting fake objects is made very easy by CPython. If you create a `bytes` object (this is not the same thing as a `bytearray`), the data is always present 32 bytes after the start of the `PyBytesObject`. We can get the address of the `PyBytesObject` with the `id` function, and we know the offset to our data, so we can do something like this:
+Crafting fake objects is made very easy by CPython. If you create a `bytes` object (this is not the same thing as a `bytearray`), the raw data within the `bytes` object is always present 32 bytes after the start of the `PyBytesObject`, in one contiguous chunk. We can get the address of the `PyBytesObject` with the `id` function, and we know the offset to our data, so we can do something like this:
 
 ```python
 fake = b''.join([
@@ -111,6 +113,8 @@ fake = b''.join([
     ])
 address_of_fake_object = id(fake) + 32
 ```
+
+Now `address_of_fake_object` will be the address of `AAAAAAAABBBBBBBBCCCC...`.
 
 The final leak primative is shown below. Note that `self.freed_buffer` is the `memoryview` pointing to the freed heap buffer, and `self.fake_objs` is the list we created whose item buffer also points to the freed heap buffer.
 
