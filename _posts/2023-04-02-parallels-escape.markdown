@@ -189,7 +189,7 @@ This chain can be exploited from within any guest operating system by any code w
 
 Overall, Parallels is a fun target. Based on the bugs I and others have found I would say that it's more immature than the likes of VirtualBox and VMWare, and I'm sure there are plenty more bugs to be found here.
 
-<!-- You can find the code for these exploits [on my GitHub](https://github.com/kn32){:target="_blank"}. -->
+You can find the code for these exploits [on my GitHub](https://github.com/kn32/parallels-plist-escape){:target="_blank"}.
 ## Timeline
 - Plist injection
   - Assigned CVE-2023-27328 / [ZDI-23-220](https://www.zerodayinitiative.com/advisories/ZDI-23-220/)
