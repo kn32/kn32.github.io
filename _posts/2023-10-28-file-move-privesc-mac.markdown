@@ -71,7 +71,7 @@ Hopefully other people find this trick useful, beyond just Parallels. You can fi
 </video>
 
 ## Timeline
-- Assigned ZDI-CAN-21227
+- **2023-05-19** - ZDI submission, assigned ZDI-CAN-21227
 - **2023-06-21** - reported to vendor
 - **2023-07-06** - fix released in version 18.3.2
-<!-- - **2023-07-??** - public release of advisory -->
+- **2023-12-19** - public release of advisory, CVE-2023-50226
