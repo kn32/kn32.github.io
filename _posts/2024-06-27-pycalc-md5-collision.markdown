@@ -5,7 +5,7 @@ date:   2024-06-27 00:00:00 +0000
 tags: ctf python
 ---
 
-![pyjail](/assets/pycalc-md5-collision/pycalc.png)
+![Pycalc challenge on CTF platform](/assets/pycalc-md5-collision/pycalc.png)
 
 I played Google CTF last weekend and there was a fun Python jail challenge, PyCalc.
 
